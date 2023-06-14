@@ -3,14 +3,16 @@ import { TbAdjustmentsHorizontal } from 'react-icons/tb'
 import { MdOutlineFilterAlt, MdCrop } from 'react-icons/md'
 import { RxRotateCounterClockwise } from 'react-icons/rx'
 import { FaImage, FaDownload, FaUpload } from 'react-icons/fa'
-import { AiOutlineLoading3Quarters } from 'react-icons/ai'
-import { LuUndo2, LuRedo2 } from 'react-icons/lu'
+import { AiOutlineLoading3Quarters, AiOutlineRotateLeft, AiOutlineRotateRight } from 'react-icons/ai'
+import { LuUndo2, LuRedo2, LuFlipHorizontal2, LuFlipVertical2 } from 'react-icons/lu'
 import Alien from './images/alien.png'
 import Exposed from './images/exposed.png'
 import Faded from './images/faded.png'
 import Grayscale from './images/grayscale.png'
 import Sepia from './images/sepia.png'
 import Vintage from './images/vintage.png'
+
+import './app.css'
 
 function App() {
   let initImage = null
@@ -31,6 +33,7 @@ function App() {
   const [debounceTime, setDebounceTime] = useState(500)
   const [imageStack, setImageStack] = useState([])
   const [stackPos, setStackPos] = useState(0)
+  const [filter, setFilter] = useState('')
   const [adjustSettings, setAdjustSettings] = useState({
     brightness: 100,
     contrast: 100,
@@ -42,10 +45,6 @@ function App() {
 
 
   // Functions
-
-  const changeFilter = (filterName) => {
-
-  }
 
   const resetAdjustSettings = () => {
     setAdjustSettings({
@@ -67,11 +66,11 @@ function App() {
     resetAdjustSettings()
   }
 
-  const applyAdjustFilters = () => {
+  const applyChanges = () => {
     setImageStack(prev => {
       const currentStack = prev.filter((item, index) => index <= stackPos)
       setStackPos(prev => prev+1)
-      return [...currentStack, canvas.current.toDataURL()]
+      return [...currentStack, canvas.current.toDataURL('image/jpeg')]
     })
   }
 
@@ -80,6 +79,8 @@ function App() {
       if (!canvas.current || imageStack.length === 0) return
       const newImage = new Image()
       newImage.onload = () => {
+        canvas.current.width = newImage.width
+        canvas.current.height = newImage.height
         const ctx = canvas.current.getContext('2d')
         ctx.clearRect(0, 0, canvas.current.width, canvas.current.height)
         ctx.drawImage(newImage, 0, 0)
@@ -106,6 +107,45 @@ function App() {
       }
       currentImage.src = imageStack[stackPos]
     }, debounceTime))
+  }
+
+  const changeFilter = (filterName) => {
+    if (filter === filterName) setFilter('')
+    else setFilter(filterName)
+  }
+
+  const rotateCanvas = direction => {
+    const newImage = new Image()
+    newImage.onload = e => {
+      const width = canvas.current.width
+      const height = canvas.current.height
+      canvas.current.height = width
+      canvas.current.width = height
+      const ctx = canvas.current.getContext('2d')
+      ctx.clearRect(0, 0, height, width)
+      ctx.save()
+      ctx.translate(height/2, width/2)
+      ctx.rotate(direction * Math.PI / 2)
+      ctx.translate(-width/2, -height/2)
+      ctx.drawImage(newImage, 0, 0)
+      ctx.restore()
+    }
+    newImage.src = canvas.current.toDataURL('image/jpeg')
+  }
+
+  const flipCanvas = direction => {
+    const newImage = new Image()
+    newImage.onload = e => {
+      console.log(canvas.current.width, canvas.current.height)
+      const ctx = canvas.current.getContext('2d')
+      ctx.clearRect(0, 0, canvas.current.width, canvas.current.height)
+      ctx.save()
+      ctx.translate(direction === -1 ? canvas.current.width : 0, direction === 1 ? canvas.current.height : 0)
+      ctx.scale(direction, -direction)
+      ctx.drawImage(newImage, 0, 0)
+      ctx.restore()
+    }
+    newImage.src = canvas.current.toDataURL('image/jpeg')
   }
 
   const resizeCanvas = () => {
@@ -155,8 +195,33 @@ function App() {
   }, [adjustSettings])
 
   useEffect(() => {
+    if (!canvas.current) return
+    if (filter === "") {
+      setDebounceTime(0)
+      setTimeout(() => {
+        setDebounceTime(500)
+      }, 200)
+      return
+    }
+    const newImage = new Image()
+    newImage.onload = e => {
+      const ctx = canvas.current.getContext('2d')
+      ctx.clearRect(0, 0, canvas.current.width, canvas.current.height)
+      if (filter === 'exposed') ctx.filter = "contrast(150%)"
+      else if (filter === 'alien') ctx.filter = "hue-rotate(40deg)"
+      else if (filter === 'faded') ctx.filter = "contrast(70%)"
+      else if (filter === 'grayscale') ctx.filter = "grayscale(100%)"
+      else if (filter === 'sepia') ctx.filter = "sepia(100%)"
+      else if (filter === 'vintage') ctx.filter = "grayscale(75%)"
+      ctx.drawImage(newImage, 0, 0)
+    }
+    newImage.src = imageStack[stackPos]
+  }, [filter])
+
+  useEffect(() => {
     drawImage()
     resetAdjustSettings()
+    setFilter('')
   }, [stackPos])
 
   useEffect(() => {
@@ -192,7 +257,7 @@ function App() {
   }, [image])
 
   return (
-    <>
+    <div className="overflow-hidden w-full h-[100vh]">
     <div className="flex justify-between items-center bg-gray-800 px-5 md:px-10 h-[60px]">
       <div className="text-2xl text-white font-bold">Picraft</div>
       {
@@ -209,7 +274,7 @@ function App() {
         )
       }
     </div>
-    <div className="h-[calc(100vh-160px)] bg-gray-100 overflow-auto p-5">
+    <div className="h-[calc(100vh-160px)] bg-gray-100 overflow-hidden p-5">
       {
         image ? (
           <canvas className="mx-auto border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
@@ -219,7 +284,7 @@ function App() {
           </div>
         ) : (
           <div className="flex flex-col gap-4 justify-center items-center h-full w-full">
-            <div className="text-2xl font-medium flex items-center gap-2"><FaImage /> Upload Image</div>
+            <div className="text-2xl text-gray-700 font-medium flex items-center gap-2"><FaImage /> Upload Image</div>
             <div className=""><button onClick={() => fileInput.current.click()} className="px-5 py-3 bg-gray-600 duration-200 hover:bg-gray-500 text-white rounded-lg flex items-center gap-2"><FaUpload />Upload</button></div>
             <input ref={fileInput} onChange={handleFileChange} type="file" className="hidden" accept="image/*" />
           </div>
@@ -254,7 +319,7 @@ function App() {
           <div className="text-white text-xs font-bold">Crop</div>
         </div>
       </div>
-      <div ref={submenu} className={`absolute flex flex-wrap justify-center items-center gap-5 top-0 left-0 w-full duration-200 px-5 md:px-10 py-5 bg-gray-800 bg-opacity-75 ${subMenu !== '' ? '-translate-y-full' : 'opacity-0 pointer-events-none'}`}>
+      <div ref={submenu} className={`absolute flex flex-wrap justify-center items-center gap-5 top-0 left-0 w-full duration-200 px-5 md:px-10 py-5 backdrop-blur-sm bg-gray-800 bg-opacity-75 ${subMenu !== '' ? '-translate-y-full' : 'opacity-0 pointer-events-none'}`}>
         {
           subMenu === 'adjust' ? (
             <>
@@ -282,8 +347,8 @@ function App() {
                 <div className="text-sm text-white font-semibold">Hue Rotate</div>
                 <div className=""><input onChange={e => setAdjustSettings(prev => {return {...prev, huerotate: e.target.value}})} type="range" min="0" max="360" value={adjustSettings.huerotate} /></div>
               </div>
-              <div className="flex flex-wrap gap-2 items-end justify-start h-full">
-                <button onClick={applyAdjustFilters} className="px-5 py-2 bg-blue-600 rounded-[5px] font-semibold duration-200 hover:bg-blue-500 text-sm text-white">Apply</button>
+              <div className="flex flex-wrap gap-2 items-end justify-start">
+                <button onClick={() => applyChanges()} className="px-5 py-2 bg-blue-600 rounded-[5px] font-semibold duration-200 hover:bg-blue-500 text-sm text-white">Apply</button>
                 <button onClick={() => {
                   setDebounceTime(0)
                   setTimeout(() => {
@@ -294,35 +359,72 @@ function App() {
             </>
           ) :
           subMenu === 'filters' ? (
-            <>
-            <div onClick={() => changeFilter('exposed')} className="flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
-              <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img src={Exposed} /></div>
-              <div className="text-sm text-white font-bold">Exposed</div>
+            <div className="flex flex-col items-center gap-2">
+              <div id="filters" className="flex justify-start max-w-full overflow-x-auto pb-5 items-center gap-5 whitespace-nowrap">
+                <div onClick={() => changeFilter('exposed')} className="inline-flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
+                  <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img alt="Filter" src={Exposed} /></div>
+                  <div className="text-sm text-white font-bold">Exposed</div>
+                </div>
+                <div onClick={() => changeFilter('alien')} className="inline-flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
+                  <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img alt="Filter" src={Alien} /></div>
+                  <div className="text-sm text-white font-bold">Alien</div>
+                </div>
+                <div onClick={() => changeFilter('faded')} className="inline-flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
+                  <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img alt="Filter" src={Faded} /></div>
+                  <div className="text-sm text-white font-bold">Faded</div>
+                </div>
+                <div onClick={() => changeFilter('grayscale')} className="inline-flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
+                  <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img alt="Filter" src={Grayscale} /></div>
+                  <div className="text-sm text-white font-bold">Grayscale</div>
+                </div>
+                <div onClick={() => changeFilter('sepia')} className="inline-flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
+                  <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img alt="Filter" src={Sepia} /></div>
+                  <div className="text-sm text-white font-bold">Sepia</div>
+                </div>
+                <div onClick={() => changeFilter('vintage')} className="inline-flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
+                  <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img alt="Filter" src={Vintage} /></div>
+                  <div className="text-sm text-white font-bold">Vintage</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 items-end justify-start">
+                <button onClick={() => applyChanges()} className="px-5 py-2 bg-blue-600 rounded-[5px] font-semibold duration-200 hover:bg-blue-500 text-sm text-white">Apply</button>
+                <button onClick={() => {
+                  setDebounceTime(0)
+                  setTimeout(() => {
+                    setDebounceTime(500)
+                  }, 200)
+                }} className="px-5 py-2 bg-yellow-600 rounded-[5px] font-semibold duration-200 hover:bg-yellow-500 text-sm text-white">Reset</button>
+              </div>
             </div>
-            <div onClick={() => changeFilter('alien')} className="flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
-              <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img src={Alien} /></div>
-              <div className="text-sm text-white font-bold">Alien</div>
-            </div>
-            <div onClick={() => changeFilter('faded')} className="flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
-              <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img src={Faded} /></div>
-              <div className="text-sm text-white font-bold">Faded</div>
-            </div>
-            <div onClick={() => changeFilter('grayscale')} className="flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
-              <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img src={Grayscale} /></div>
-              <div className="text-sm text-white font-bold">Grayscale</div>
-            </div>
-            <div onClick={() => changeFilter('sepia')} className="flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
-              <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img src={Sepia} /></div>
-              <div className="text-sm text-white font-bold">Sepia</div>
-            </div>
-            <div onClick={() => changeFilter('vintage')} className="flex flex-col gap-2 justify-center items-center cursor-pointer opacity-75 duration-200 hover:opacity-100">
-              <div className="aspect-video w-[150px] rounded-lg overflow-hidden"><img src={Vintage} /></div>
-              <div className="text-sm text-white font-bold">Vintage</div>
-            </div>
-            </>
           ) :
           subMenu === 'orientation' ? (
-            <>Orientation</>
+            <>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button onClick={() => rotateCanvas(-1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><AiOutlineRotateLeft /></button>
+              <div className="text-white text-xs font-bold">Rotate Left</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button onClick={() => rotateCanvas(1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><AiOutlineRotateRight /></button>
+              <div className="text-white text-xs font-bold">Rotate Right</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button onClick={() => flipCanvas(-1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><LuFlipHorizontal2 /></button>
+              <div className="text-white text-xs font-bold">Flip Horizontally</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button onClick={() => flipCanvas(1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><LuFlipVertical2 /></button>
+              <div className="text-white text-xs font-bold">Flip Vertically</div>
+            </div>
+            <div className="flex flex-wrap gap-2 items-end justify-start">
+              <button onClick={() => applyChanges()} className="px-5 py-2 bg-blue-600 rounded-[5px] font-semibold duration-200 hover:bg-blue-500 text-sm text-white">Apply</button>
+              <button onClick={() => {
+                setDebounceTime(0)
+                setTimeout(() => {
+                  setDebounceTime(500)
+                }, 200)
+              }} className="px-5 py-2 bg-yellow-600 rounded-[5px] font-semibold duration-200 hover:bg-yellow-500 text-sm text-white">Reset</button>
+            </div>
+            </>
           ) :
           subMenu === 'crop' ? (
             <>Crop</>
@@ -330,15 +432,8 @@ function App() {
         }
       </div>
     </div>
-    </>
+    </div>
   );
 }
 
 export default App;
-
-// Brightness
-// Contrast
-// Saturation
-// Grayscale
-// Sepia
-// Hue

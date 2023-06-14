@@ -1,0 +1,11 @@
+#filters::-webkit-scrollbar {
+    height: 5px;
+}
+
+#filters::-webkit-scrollbar-thumb {
+    background-color: #333333;
+}
+
+button:disabled {
+    opacity: 50%;
+}
