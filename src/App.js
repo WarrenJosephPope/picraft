@@ -34,6 +34,7 @@ function App() {
   const [imageStack, setImageStack] = useState([])
   const [stackPos, setStackPos] = useState(0)
   const [filter, setFilter] = useState('')
+  const [scale, setScale] = useState(100)
   const [adjustSettings, setAdjustSettings] = useState({
     brightness: 100,
     contrast: 100,
@@ -187,12 +188,21 @@ function App() {
     fr.readAsDataURL(file)
   }
 
+  const handleScroll = e => {
+    setScale(prev => prev + (e.deltaY < 0 ? 1 : -1))
+  }
+
 
   // Effect Hooks
 
   useEffect(() => {
     handleAdjustSettingsChange()
   }, [adjustSettings])
+
+  useEffect(() => {
+    if (!canvas.current) return
+    canvas.current.style.scale = `${scale}%`
+  }, [scale])
 
   useEffect(() => {
     if (!canvas.current) return
@@ -277,7 +287,7 @@ function App() {
     <div className="h-[calc(100vh-160px)] bg-gray-100 overflow-hidden p-5">
       {
         image ? (
-          <canvas className="mx-auto border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
+          <canvas onWheel={handleScroll} className="mx-auto border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
         ) : isLoading ?  (
           <div className="flex justify-center items-center w-full h-full">
             <AiOutlineLoading3Quarters className="animate-spin" />
