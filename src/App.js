@@ -1,10 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+
+// Icons
 import { TbAdjustmentsHorizontal } from 'react-icons/tb'
 import { MdOutlineFilterAlt, MdCrop } from 'react-icons/md'
 import { RxRotateCounterClockwise } from 'react-icons/rx'
 import { FaImage, FaDownload, FaUpload } from 'react-icons/fa'
 import { AiOutlineLoading3Quarters, AiOutlineRotateLeft, AiOutlineRotateRight } from 'react-icons/ai'
 import { LuUndo2, LuRedo2, LuFlipHorizontal2, LuFlipVertical2 } from 'react-icons/lu'
+import { BsAspectRatio, BsCircle, BsSquare } from 'react-icons/bs'
+import { GiHamburgerMenu } from 'react-icons/gi'
+
+// Images
 import Alien from './images/alien.png'
 import Exposed from './images/exposed.png'
 import Faded from './images/faded.png'
@@ -35,6 +42,7 @@ function App() {
   const [stackPos, setStackPos] = useState(0)
   const [filter, setFilter] = useState('')
   const [scale, setScale] = useState(100)
+  const [showNavmenu, setShowNavmenu] = useState(false)
   const [adjustSettings, setAdjustSettings] = useState({
     brightness: 100,
     contrast: 100,
@@ -46,6 +54,10 @@ function App() {
 
 
   // Functions
+
+  const toggleNavbar = () => {
+    setShowNavmenu(prev => !prev)
+  }
 
   const resetAdjustSettings = () => {
     setAdjustSettings({
@@ -85,6 +97,7 @@ function App() {
         const ctx = canvas.current.getContext('2d')
         ctx.clearRect(0, 0, canvas.current.width, canvas.current.height)
         ctx.drawImage(newImage, 0, 0)
+        resizeCanvas()
         resolve()
       }
       newImage.onerror = () => reject()
@@ -130,6 +143,7 @@ function App() {
       ctx.translate(-width/2, -height/2)
       ctx.drawImage(newImage, 0, 0)
       ctx.restore()
+      resizeCanvas()
     }
     newImage.src = canvas.current.toDataURL('image/jpeg')
   }
@@ -186,10 +200,6 @@ function App() {
     const fr = new FileReader()
     fr.addEventListener('load', handleLoadFile)
     fr.readAsDataURL(file)
-  }
-
-  const handleScroll = e => {
-    setScale(prev => prev + (e.deltaY < 0 ? 1 : -1))
   }
 
 
@@ -254,6 +264,7 @@ function App() {
   }, [imageStack, subMenu])
 
   useEffect(() => {
+    if (!canvas.current) return
     if (image !== null) {
       canvas.current.width = image.naturalWidth
       canvas.current.height = image.naturalHeight
@@ -269,10 +280,11 @@ function App() {
   return (
     <div className="overflow-hidden w-full h-[100vh]">
     <div className="flex justify-between items-center bg-gray-800 px-5 md:px-10 h-[60px]">
-      <div className="text-2xl text-white font-bold">Picraft</div>
+      <div className="text-2xl text-white font-bold">Dope's Image Editor</div>
       {
         image && (
-          <div className="flex gap-2">
+          <>
+          <div className="hidden lg:flex gap-2">
             <button onClick={() => resetAllSettings()} className="text-white flex gap-2 items-center px-5 py-2 bg-yellow-600 rounded-[4px] duration-200 hover:bg-yellow-500">Pick another image</button>
             <select className="bg-gray-600 outline-none border-none px-5 py-2 text-white">
               <option>JPG</option>
@@ -281,13 +293,19 @@ function App() {
             </select>
             <button className="text-white flex gap-2 items-center px-5 py-2 bg-gray-600 rounded-[4px] duration-200 hover:bg-gray-500">Download <FaDownload /></button>
           </div>
+          <button onClick={() => toggleNavbar()} className="text-white text-lg lg:hidden"><GiHamburgerMenu /></button>
+          </>
         )
       }
     </div>
-    <div className="h-[calc(100vh-160px)] bg-gray-100 overflow-hidden p-5">
+    <div className="h-[calc(100vh-160px)] relative bg-gray-100 overflow-hidden p-5">
       {
         image ? (
-          <canvas onWheel={handleScroll} className="mx-auto border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
+            <TransformWrapper className="w-full">
+              <TransformComponent>
+                <canvas className="mx-auto border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
+              </TransformComponent>
+            </TransformWrapper>
         ) : isLoading ?  (
           <div className="flex justify-center items-center w-full h-full">
             <AiOutlineLoading3Quarters className="animate-spin" />
@@ -437,7 +455,28 @@ function App() {
             </>
           ) :
           subMenu === 'crop' ? (
-            <>Crop</>
+            <>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsSquare /></button>
+              <div className="text-white text-xs font-bold">Free Crop</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsCircle /></button>
+              <div className="text-white text-xs font-bold">Circle Crop</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <div className="text-white text-xs font-bold">1:1</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <div className="text-white text-xs font-bold">16:9</div>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <div className="text-white text-xs font-bold">4:3</div>
+            </div>
+            </>
           ) : (<></>)
         }
       </div>
