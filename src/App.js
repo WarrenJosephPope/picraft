@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+import Cropper from 'react-cropper'
 
 // Icons
 import { TbAdjustmentsHorizontal } from 'react-icons/tb'
@@ -10,6 +11,7 @@ import { AiOutlineLoading3Quarters, AiOutlineRotateLeft, AiOutlineRotateRight } 
 import { LuUndo2, LuRedo2, LuFlipHorizontal2, LuFlipVertical2 } from 'react-icons/lu'
 import { BsAspectRatio, BsCircle, BsSquare } from 'react-icons/bs'
 import { GiHamburgerMenu } from 'react-icons/gi'
+import { RxText } from 'react-icons/rx'
 
 // Images
 import Alien from './images/alien.png'
@@ -19,21 +21,24 @@ import Grayscale from './images/grayscale.png'
 import Sepia from './images/sepia.png'
 import Vintage from './images/vintage.png'
 
+// Stylehseets
 import './app.css'
+import "cropperjs/dist/cropper.css"
 
 function App() {
   let initImage = null
 
   // Ref Hooks
-
+  
   const fileInput = useRef()
   const canvas = useRef()
   const submenu = useRef()
-
+  const cropper = useRef()
 
   // State Hooks
 
   const [image, setImage] = useState(null)
+  const [fileName, setFileName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [subMenu, setSubmenu] = useState('')
   const [debounce, setDebounce] = useState(null)
@@ -41,7 +46,7 @@ function App() {
   const [imageStack, setImageStack] = useState([])
   const [stackPos, setStackPos] = useState(0)
   const [filter, setFilter] = useState('')
-  const [scale, setScale] = useState(100)
+  const [isCrop, setIsCrop] = useState(false)
   const [showNavmenu, setShowNavmenu] = useState(false)
   const [adjustSettings, setAdjustSettings] = useState({
     brightness: 100,
@@ -51,12 +56,40 @@ function App() {
     sepia: 0,
     huerotate: 0
   })
-
+  const [downloadFormat, setDownloadFormat] = useState('jpeg')
 
   // Functions
 
   const toggleNavbar = () => {
     setShowNavmenu(prev => !prev)
+  }
+
+  const handleDownload = () => {
+    const newImage = new Image()
+    newImage.onload = () => {
+      const newCanvas = document.createElement('canvas')
+      newCanvas.width = newImage.naturalWidth
+      newCanvas.height = newImage.naturalHeight
+      const ctx = newCanvas.getContext('2d')
+      ctx.drawImage(newImage, 0, 0)
+
+      const a = document.createElement('a')
+      a.href = newCanvas.toDataURL(`image/${downloadFormat}`)
+      a.download = `${fileName}-picraft.${downloadFormat}`
+      a.click()
+    }
+    newImage.src = imageStack[stackPos]
+  }
+
+  const setAspectRatio = (value, shape) => {
+    const obj = cropper.current?.cropper
+    if (!obj) return
+    if (shape === 0) {
+      document.querySelector(".cropper-view-box").style.borderRadius = null
+    } else {
+      document.querySelector(".cropper-view-box").style.borderRadius = "50%"
+    }
+    obj.setAspectRatio(value)
   }
 
   const resetAdjustSettings = () => {
@@ -83,8 +116,12 @@ function App() {
     setImageStack(prev => {
       const currentStack = prev.filter((item, index) => index <= stackPos)
       setStackPos(prev => prev+1)
-      return [...currentStack, canvas.current.toDataURL('image/jpeg')]
+      return [...currentStack, canvas.current.toDataURL()]
     })
+  }
+
+  const applyCrop = () => {
+    
   }
 
   const drawImage = () => {
@@ -145,7 +182,7 @@ function App() {
       ctx.restore()
       resizeCanvas()
     }
-    newImage.src = canvas.current.toDataURL('image/jpeg')
+    newImage.src = canvas.current.toDataURL()
   }
 
   const flipCanvas = direction => {
@@ -160,10 +197,11 @@ function App() {
       ctx.drawImage(newImage, 0, 0)
       ctx.restore()
     }
-    newImage.src = canvas.current.toDataURL('image/jpeg')
+    newImage.src = canvas.current.toDataURL()
   }
 
   const resizeCanvas = () => {
+    if (!canvas.current) return
     const width = canvas.current.width
     const height = canvas.current.height
     
@@ -196,6 +234,7 @@ function App() {
 
   const handleFileChange = e => {
     const file = e.target.files[0]
+    setFileName(file.name.split('.')[0])
     setIsLoading(true)
     const fr = new FileReader()
     fr.addEventListener('load', handleLoadFile)
@@ -208,11 +247,6 @@ function App() {
   useEffect(() => {
     handleAdjustSettingsChange()
   }, [adjustSettings])
-
-  useEffect(() => {
-    if (!canvas.current) return
-    canvas.current.style.scale = `${scale}%`
-  }, [scale])
 
   useEffect(() => {
     if (!canvas.current) return
@@ -261,7 +295,17 @@ function App() {
     setTimeout(() => {
       setDebounceTime(500)
     }, 200)
-  }, [imageStack, subMenu])
+  }, [imageStack])
+
+  useEffect(() => {
+    if (subMenu === '') return
+    if (subMenu === 'crop') setIsCrop(true)
+    else setIsCrop(false)
+    setDebounceTime(0)
+    setTimeout(() => {
+      setDebounceTime(500)
+    }, 200)
+  }, [subMenu])
 
   useEffect(() => {
     if (!canvas.current) return
@@ -279,33 +323,54 @@ function App() {
 
   return (
     <div className="overflow-hidden w-full h-[100vh]">
-    <div className="flex justify-between items-center bg-gray-800 px-5 md:px-10 h-[60px]">
-      <div className="text-2xl text-white font-bold">Dope's Image Editor</div>
+    <div className="relative z-[1] flex justify-between items-center bg-gray-800 px-5 md:px-10 h-[60px]">
+      <div className="text-2xl text-white font-bold"><span className="sm:hidden">DIE</span><span className="hidden sm:block">Dope's Image Editor</span></div>
       {
         image && (
           <>
           <div className="hidden lg:flex gap-2">
             <button onClick={() => resetAllSettings()} className="text-white flex gap-2 items-center px-5 py-2 bg-yellow-600 rounded-[4px] duration-200 hover:bg-yellow-500">Pick another image</button>
-            <select className="bg-gray-600 outline-none border-none px-5 py-2 text-white">
-              <option>JPG</option>
-              <option>PNG</option>
-              <option>WebP</option>
+            <select value={downloadFormat} onChange={e => setDownloadFormat(e.target.value)} className="bg-gray-600 outline-none border-none px-5 py-2 text-white">
+              <option value="jpeg">JPG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WebP</option>
             </select>
-            <button className="text-white flex gap-2 items-center px-5 py-2 bg-gray-600 rounded-[4px] duration-200 hover:bg-gray-500">Download <FaDownload /></button>
+            <button onClick={() => handleDownload()} className="text-white flex gap-2 items-center px-5 py-2 bg-gray-600 rounded-[4px] duration-200 hover:bg-gray-500">Download <FaDownload /></button>
           </div>
           <button onClick={() => toggleNavbar()} className="text-white text-lg lg:hidden"><GiHamburgerMenu /></button>
+          <div className={`absolute top-[60px] right-0 bg-gray-800 duration-200 flex flex-col gap-3 p-3 ${showNavmenu ? '' : 'opacity-0 pointer-events-none translate-x-full'}`}>
+            <button onClick={() => resetAllSettings()} className="text-xs w-full text-white flex gap-2 items-center px-5 py-2 bg-yellow-600 rounded-[4px] duration-200 hover:bg-yellow-500">Pick another image</button>
+            <select value={downloadFormat} onChange={e => setDownloadFormat(e.target.value)} className="text-xs w-full bg-gray-600 outline-none border-none px-5 py-2 text-white">
+              <option value="jpeg">JPG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WebP</option>
+            </select>
+            <button onClick={() => handleDownload()} className="text-xs w-full text-white flex gap-2 items-center px-5 py-2 bg-gray-600 rounded-[4px] duration-200 hover:bg-gray-500">Download <FaDownload /></button>
+          </div>
           </>
         )
       }
     </div>
-    <div className="h-[calc(100vh-160px)] relative bg-gray-100 overflow-hidden p-5">
+    <div className="h-[calc(100vh-160px)] bg-gray-100 p-5 flex justify-center items-center">
       {
         image ? (
-            <TransformWrapper className="w-full">
+          isCrop ? (
+            <>
+              <canvas className="hidden" ref={canvas}></canvas>
+              <Cropper
+                ref={cropper}
+                src={canvas.current.toDataURL()}
+                className="w-full h-full"
+                viewMode="2"
+              />
+            </>
+          ) : (
+            <TransformWrapper>
               <TransformComponent>
-                <canvas className="mx-auto border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
+                <canvas className="border-2 border-gray-400 border-dashed" ref={canvas}></canvas>
               </TransformComponent>
             </TransformWrapper>
+          )
         ) : isLoading ?  (
           <div className="flex justify-center items-center w-full h-full">
             <AiOutlineLoading3Quarters className="animate-spin" />
@@ -323,28 +388,32 @@ function App() {
       <div className="overflow-x-auto max-w-full flex items-center justify-start gap-8 bg-gray-800 px-5 md:px-10 h-[100px]">
         <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setStackPos(prev => prev === 0 ? prev : prev-1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><LuUndo2 /></button>
-          <div className="text-white text-xs font-bold">Undo</div>
+          <div className="text-white text-xs font-bold text-center">Undo</div>
         </div>
         <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setStackPos(prev => prev === imageStack.length-1 ? prev : prev+1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><LuRedo2 /></button>
-          <div className="text-white text-xs font-bold">Redo</div>
+          <div className="text-white text-xs font-bold text-center">Redo</div>
         </div>
         <div className="border-l border-gray-400 h-[60%]"></div>
         <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'adjust' ? '' : 'adjust')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><TbAdjustmentsHorizontal /></button>
-          <div className="text-white text-xs font-bold">Adjust</div>
+          <div className="text-white text-xs font-bold text-center">Adjust</div>
         </div>
         <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'filters' ? '' : 'filters')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><MdOutlineFilterAlt /></button>
-          <div className="text-white text-xs font-bold">Filters</div>
+          <div className="text-white text-xs font-bold text-center">Filters</div>
         </div>
         <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'orientation' ? '' : 'orientation')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><RxRotateCounterClockwise /></button>
-          <div className="text-white text-xs font-bold">Orientation</div>
+          <div className="text-white text-xs font-bold text-center">Orientation</div>
         </div>
         <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'crop' ? '' : 'crop')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><MdCrop /></button>
-          <div className="text-white text-xs font-bold">Crop</div>
+          <div className="text-white text-xs font-bold text-center">Crop</div>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-2">
+          <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'text' ? '' : 'text')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><RxText /></button>
+          <div className="text-white text-xs font-bold text-center">Add Text</div>
         </div>
       </div>
       <div ref={submenu} className={`absolute flex flex-wrap justify-center items-center gap-5 top-0 left-0 w-full duration-200 px-5 md:px-10 py-5 backdrop-blur-sm bg-gray-800 bg-opacity-75 ${subMenu !== '' ? '-translate-y-full' : 'opacity-0 pointer-events-none'}`}>
@@ -457,24 +526,28 @@ function App() {
           subMenu === 'crop' ? (
             <>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsSquare /></button>
+              <button onClick={() => setAspectRatio(NaN, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsSquare /></button>
               <div className="text-white text-xs font-bold">Free Crop</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsCircle /></button>
+              <button onClick={() => setAspectRatio(NaN, 1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsCircle /></button>
               <div className="text-white text-xs font-bold">Circle Crop</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <button onClick={() => setAspectRatio(1, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
               <div className="text-white text-xs font-bold">1:1</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <button onClick={() => setAspectRatio(16/9, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
               <div className="text-white text-xs font-bold">16:9</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <button onClick={() => setAspectRatio(4/3, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
               <div className="text-white text-xs font-bold">4:3</div>
+            </div>
+            <div className="flex flex-wrap gap-2 items-end justify-start">
+              <button onClick={() => applyCrop()} className="px-5 py-2 bg-blue-600 rounded-[5px] font-semibold duration-200 hover:bg-blue-500 text-sm text-white">Apply</button>
+              <button onClick={() => setAspectRatio(NaN, 0)} className="px-5 py-2 bg-yellow-600 rounded-[5px] font-semibold duration-200 hover:bg-yellow-500 text-sm text-white">Reset</button>
             </div>
             </>
           ) : (<></>)
