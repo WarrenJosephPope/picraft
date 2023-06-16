@@ -84,6 +84,7 @@ function App() {
   const setAspectRatio = (value, shape) => {
     const obj = cropper.current?.cropper
     if (!obj) return
+    setSubmenu('')
     if (shape === 0) {
       document.querySelector(".cropper-view-box").style.borderRadius = null
     } else if (shape === 1) {
