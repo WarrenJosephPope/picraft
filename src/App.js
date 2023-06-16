@@ -86,10 +86,11 @@ function App() {
     if (!obj) return
     if (shape === 0) {
       document.querySelector(".cropper-view-box").style.borderRadius = null
-    } else {
+    } else if (shape === 1) {
       document.querySelector(".cropper-view-box").style.borderRadius = "50%"
     }
-    obj.setAspectRatio(value)
+    if (value !== null)
+      obj.setAspectRatio(value)
   }
 
   const resetAdjustSettings = () => {
@@ -121,7 +122,29 @@ function App() {
   }
 
   const applyCrop = () => {
-    
+    if (!cropper.current) return
+    const croppedCanvas = cropper.current.cropper.getCroppedCanvas()
+    const newImage = new Image()
+    newImage.onload = () => {
+      if (document.querySelector(".cropper-view-box").style.borderRadius === "50%") {
+        console.log("Here")
+        document.querySelector(".cropper-view-box").style.borderRadius = null
+        const ctx = croppedCanvas.getContext('2d')
+        ctx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height)
+        ctx.beginPath()
+        ctx.ellipse(croppedCanvas.width/2, croppedCanvas.height/2, croppedCanvas.width/2, croppedCanvas.height/2, 0, 0, 2*Math.PI)
+        ctx.clip()
+        ctx.drawImage(newImage, 0, 0)
+      }
+      setImageStack(prev => {
+        const currentStack = prev.filter((item, index) => index <= stackPos)
+        setStackPos(prev => prev+1)
+        return [...currentStack, croppedCanvas.toDataURL()]
+      })
+      setSubmenu('')
+      setIsCrop(false)
+    }
+    newImage.src = croppedCanvas.toDataURL()
   }
 
   const drawImage = () => {
@@ -530,19 +553,19 @@ function App() {
               <div className="text-white text-xs font-bold">Free Crop</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button onClick={() => setAspectRatio(NaN, 1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsCircle /></button>
+              <button onClick={() => setAspectRatio(null, 1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsCircle /></button>
               <div className="text-white text-xs font-bold">Circle Crop</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button onClick={() => setAspectRatio(1, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <button onClick={() => setAspectRatio(1, -1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
               <div className="text-white text-xs font-bold">1:1</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button onClick={() => setAspectRatio(16/9, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <button onClick={() => setAspectRatio(16/9, -1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
               <div className="text-white text-xs font-bold">16:9</div>
             </div>
             <div className="flex flex-col items-center justify-center gap-2">
-              <button onClick={() => setAspectRatio(4/3, 0)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
+              <button onClick={() => setAspectRatio(4/3, -1)} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsAspectRatio /></button>
               <div className="text-white text-xs font-bold">4:3</div>
             </div>
             <div className="flex flex-wrap gap-2 items-end justify-start">
