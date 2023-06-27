@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import Cropper from 'react-cropper'
+import { fabric } from 'fabric'
+import axios from 'axios'
 
 // Icons
 import { TbAdjustmentsHorizontal } from 'react-icons/tb'
@@ -12,6 +14,7 @@ import { LuUndo2, LuRedo2, LuFlipHorizontal2, LuFlipVertical2 } from 'react-icon
 import { BsAspectRatio, BsCircle, BsSquare } from 'react-icons/bs'
 import { GiHamburgerMenu } from 'react-icons/gi'
 import { RxText } from 'react-icons/rx'
+import { IoMdColorPalette } from 'react-icons/io'
 
 // Images
 import Alien from './images/alien.png'
@@ -47,6 +50,7 @@ function App() {
   const [stackPos, setStackPos] = useState(0)
   const [filter, setFilter] = useState('')
   const [isCrop, setIsCrop] = useState(false)
+  const [isFabric, setIsFabric] = useState(false)
   const [showNavmenu, setShowNavmenu] = useState(false)
   const [adjustSettings, setAdjustSettings] = useState({
     brightness: 100,
@@ -79,6 +83,12 @@ function App() {
       a.click()
     }
     newImage.src = imageStack[stackPos]
+  }
+
+  const colorizeImage = async () => {
+    const imgData = canvas.current.toDataURL()
+    const res = await axios.post('http://localhost:5000/colorize', { image: imgData })
+    console.log(res.data)
   }
 
   const setAspectRatio = (value, shape) => {
@@ -256,13 +266,25 @@ function App() {
     initImage.src = e.target.result
   }
 
-  const handleFileChange = e => {
-    const file = e.target.files[0]
+  const loadFile = file => {
     setFileName(file.name.split('.')[0])
     setIsLoading(true)
     const fr = new FileReader()
     fr.addEventListener('load', handleLoadFile)
     fr.readAsDataURL(file)
+  }
+
+  const handleDrop = e => {
+    e.preventDefault()
+    if (image === null) {
+      const file = e.dataTransfer.files[0]
+      loadFile(file)
+    }
+  }
+
+  const handleFileChange = e => {
+    const file = e.target.files[0]
+    loadFile(file)
   }
 
 
@@ -323,13 +345,24 @@ function App() {
 
   useEffect(() => {
     if (subMenu === '') return
+    
     if (subMenu === 'crop') setIsCrop(true)
     else setIsCrop(false)
+
+    if (subMenu === 'text') setIsFabric(true)
+    else setIsFabric(false)
+    
     setDebounceTime(0)
     setTimeout(() => {
       setDebounceTime(500)
     }, 200)
   }, [subMenu])
+
+  useEffect(() => {
+    if (isFabric) {
+      const canvas = new fabric.Canvas('fabric-canvas')
+    }
+  }, [isFabric])
 
   useEffect(() => {
     if (!canvas.current) return
@@ -375,7 +408,7 @@ function App() {
         )
       }
     </div>
-    <div className="h-[calc(100vh-160px)] bg-gray-100 p-5 flex justify-center items-center">
+    <div onDragOver={e => e.preventDefault()} onDrop={handleDrop} className="h-[calc(100vh-160px)] bg-gray-100 p-5 flex justify-center items-center">
       {
         image ? (
           isCrop ? (
@@ -435,9 +468,13 @@ function App() {
           <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'crop' ? '' : 'crop')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><MdCrop /></button>
           <div className="text-white text-xs font-bold text-center">Crop</div>
         </div>
-        <div className="flex flex-col items-center justify-center gap-2">
+        {/* <div className="flex flex-col items-center justify-center gap-2">
           <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'text' ? '' : 'text')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><RxText /></button>
           <div className="text-white text-xs font-bold text-center">Add Text</div>
+        </div> */}
+        <div className="flex flex-col items-center justify-center gap-2">
+          <button disabled={image===null} onClick={() => setSubmenu(prev => prev === 'colorize' ? '' : 'colorize')} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><IoMdColorPalette /></button>
+          <div className="text-white text-xs font-bold text-center">Colorize</div>
         </div>
       </div>
       <div ref={submenu} className={`absolute flex flex-wrap justify-center items-center gap-5 top-0 left-0 w-full duration-200 px-5 md:px-10 py-5 backdrop-blur-sm bg-gray-800 bg-opacity-75 ${subMenu !== '' ? '-translate-y-full' : 'opacity-0 pointer-events-none'}`}>
@@ -574,7 +611,15 @@ function App() {
               <button onClick={() => setAspectRatio(NaN, 0)} className="px-5 py-2 bg-yellow-600 rounded-[5px] font-semibold duration-200 hover:bg-yellow-500 text-sm text-white">Reset</button>
             </div>
             </>
-          ) : (<></>)
+          ) : 
+          subMenu === 'colorize' ? (
+            <>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <button onClick={() => colorizeImage()} className="bg-gray-700 duration-200 hover:bg-gray-600 text-white p-2 text-2xl rounded-full"><BsSquare /></button>
+              <div className="text-white text-xs font-bold">Colorize Image</div>
+            </div>
+            </>
+          ):(<></>)
         }
       </div>
     </div>
