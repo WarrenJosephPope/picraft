@@ -26,9 +26,9 @@ jobs:
       env:
         RSYNC_RSH: ssh
 
-    - name: Copy .env file
-      run: |
-        ssh root@93.127.206.2 'cp /path/to/.env /var/www/picraft/.env'
+    # - name: Copy .env file
+    #   run: |
+    #     ssh root@93.127.206.2 'cp /path/to/.env /var/www/picraft/.env'
 
     - name: Install dependencies and build project
       run: |
